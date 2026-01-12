@@ -1,5 +1,22 @@
 import { NextResponse } from "next/server";
 import { Groq } from "groq-sdk";
+import { pluginRegistry } from "@/plugins";
+import { initializePlugins } from "@/plugins";
+
+// Initialize plugins on module load (only once)
+let pluginsInitialized = false;
+let initPromise: Promise<void> | null = null;
+
+function ensurePluginsInitialized() {
+  if (!pluginsInitialized && !initPromise) {
+    initPromise = initializePlugins()
+      .then(() => {
+        pluginsInitialized = true;
+      })
+      .catch(console.error);
+  }
+  return initPromise || Promise.resolve();
+}
 
 const groqClient = new Groq({
   apiKey: process.env.GROQ_API_KEY as string,
@@ -7,6 +24,9 @@ const groqClient = new Groq({
 
 export async function POST(req: Request) {
   try {
+    // Ensure plugins are initialized
+    await ensurePluginsInitialized();
+
     const {
       type,
       data,
@@ -40,64 +60,20 @@ export async function POST(req: Request) {
       content: prompt,
     });
 
+    // Get all functions from registered plugins
+    const pluginFunctions = pluginRegistry.getAllFunctions();
+    const tools = pluginFunctions.map((item) => item.function);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await groqClient.chat.completions.create({
       model: "llama3-70b-8192",
       max_tokens: 2024,
-      messages: messages as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: messages as any, // Groq SDK expects specific message format
       temperature: 0.7,
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "transfer",
-            description:
-              "Transfer tokens from the user's wallet to another address",
-            parameters: {
-              type: "object",
-              properties: {
-                address: {
-                  type: "string",
-                  description: "Recipient wallet address",
-                },
-                token1: {
-                  type: "string",
-                  description:
-                    "Token symbol to transfer (e.g., TRBTC, DOC, RIF)",
-                },
-                amount: {
-                  type: "number",
-                  description: "Amount of tokens to transfer",
-                },
-              },
-              required: ["address", "token1", "amount"],
-            },
-          },
-        },
-        {
-          type: "function",
-          function: {
-            name: "balance",
-            description: "Check token balance for an address",
-            parameters: {
-              type: "object",
-              properties: {
-                address: {
-                  type: "string",
-                  description:
-                    "Wallet address to check (defaults to user's wallet if empty)",
-                },
-                token1: {
-                  type: "string",
-                  description:
-                    "Token symbol to check balance for (e.g., TRBTC, DOC, RIF)",
-                },
-              },
-              required: ["token1"],
-            },
-          },
-        },
-      ],
-      tool_choice: "auto",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tools: tools.length > 0 ? (tools as any) : undefined,
+      tool_choice: tools.length > 0 ? "auto" : undefined,
     });
 
     const aiMessage = response.choices[0].message;
@@ -159,7 +135,7 @@ function getSystemPrompt() {
   BE EXTREMELY BRIEF. Your responses should be scannable in 5 seconds or less.`;
 }
 
-function createChatPrompt(userContext: any, question: string, address: string) {
+function createChatPrompt(userContext: unknown, question: string, address: string) {
   return `I need your help with the following DeFi request for my Rootstock testnet wallet (${address}):
   
   USER QUESTION: "${question}"

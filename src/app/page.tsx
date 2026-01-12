@@ -11,15 +11,9 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { useConfig } from "wagmi";
-import {
-  getBalance,
-  readContract,
-  sendTransaction,
-  writeContract,
-} from "@wagmi/core";
-import { checksumAddress, erc20Abi, isAddress, parseEther } from "viem";
-import { findToken, isValidWalletAddress } from "@/lib/utils";
+import { isValidWalletAddress } from "@/lib/utils";
 import { BLOCK_EXPLORER_URL } from "@/lib/contants";
+import { executePluginFunction } from "@/plugins/client-executor";
 
 export default function Home() {
   const [messages, setMessages] = useState<
@@ -37,87 +31,6 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleTransfer = async (data: {
-    token1: string;
-    address: string;
-    amount: number;
-  }) => {
-    console.log("Data:", data);
-    try {
-      const tokenAddress =
-        data.token1.toLowerCase() === "trbtc"
-          ? "trbtc"
-          : await findToken(data.token1);
-
-      if (!tokenAddress) throw new Error("Token not found");
-
-      let transactionHash: string;
-      if (tokenAddress === "trbtc") {
-        transactionHash = await sendTransaction(config, {
-          to: data.address as `0x${string}`,
-          value: parseEther(data.amount.toString()),
-        });
-      } else {
-        transactionHash = await writeContract(config, {
-          abi: erc20Abi,
-          address: tokenAddress as `0x${string}`,
-          functionName: "transfer",
-          args: [data.address as `0x${string}`, BigInt(data.amount)],
-        });
-      }
-
-      return transactionHash;
-    } catch (error) {
-      console.error("Transfer failed:", error);
-      throw error;
-    }
-  };
-
-  const handleBalance = async (data: any) => {
-    try {
-      const tokenAdd =
-        data.token1.toLowerCase() === "trbtc"
-          ? "trbtc"
-          : await findToken(data.token1);
-
-      if (!tokenAdd && data.token1.toLowerCase() !== "trbtc") {
-        throw new Error("Token not found");
-      }
-
-      const acc = isAddress(data.address) ? data.address : address;
-
-      let balance;
-
-      if (tokenAdd === "trbtc") {
-        const queryBalance = await getBalance(config, {
-          address: acc,
-        });
-
-        balance = {
-          displayValue: Number(queryBalance.value) / 10e18,
-          symbol: "tRBTC",
-        };
-      } else {
-        const queryBalance = await readContract(config, {
-          abi: erc20Abi,
-          address: checksumAddress(tokenAdd as `0x${string}`) as `0x${string}`,
-          functionName: "balanceOf",
-          args: [acc],
-        });
-        balance = {
-          displayValue: Number(queryBalance) / 10e18,
-
-          symbol: data.token1,
-        };
-      }
-
-      return balance;
-    } catch (error) {
-      console.error("Failed to fetch balance:", error);
-      throw error;
-    }
-  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -176,68 +89,98 @@ export default function Home() {
       if (data?.functionCall) {
         const functionData = data.functionCall;
 
-        switch (functionData.name) {
-          case "transfer":
-            if (!isValidWalletAddress(functionData?.arguments?.address)) {
-              throw new Error("Invalid wallet address");
-            }
-            const transactionHash = await handleTransfer(
-              functionData.arguments
-            );
-            setMessages([
-              ...newMessages.slice(0, -1),
-              {
-                role: "bot",
-                content: (
+        try {
+          // Execute plugin function dynamically
+          const pluginContext = {
+            address,
+            isConnected,
+            config,
+          };
+
+          // Validate address for transfer function
+          if (functionData.name === "transfer" && !isValidWalletAddress(functionData?.arguments?.address)) {
+            throw new Error("Invalid wallet address");
+          }
+
+          const result = await executePluginFunction(
+            functionData.name,
+            functionData.arguments,
+            pluginContext
+          );
+
+          if (result.success) {
+            // Handle display content if provided, otherwise format the data
+            let displayContent: React.ReactNode;
+
+            if (result.displayContent) {
+              displayContent = result.displayContent;
+            } else if (result.data) {
+              // Format common result types
+              const data = result.data as Record<string, unknown>;
+
+              if (data.transactionHash && typeof data.transactionHash === "string") {
+                const txHash = data.transactionHash;
+                const explorerUrl = typeof data.explorerUrl === "string" ? data.explorerUrl : `${BLOCK_EXPLORER_URL}${txHash}`;
+                displayContent = (
                   <a
-                    href={`${BLOCK_EXPLORER_URL}${transactionHash}`}
+                    href={explorerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
                   >
-                    Transaction:{" "}
-                    {`${transactionHash.slice(0, 6)}...${transactionHash.slice(
-                      -4
-                    )}`}
+                    Transaction: {`${txHash.slice(0, 6)}...${txHash.slice(-4)}`}
                     <ExternalLink size={16} />
                   </a>
-                ),
-              },
-            ]);
-            break;
-
-          case "balance":
-            const balance = await handleBalance(functionData.arguments);
-            setMessages([
-              ...newMessages.slice(0, -1),
-              {
-                role: "bot",
-                content: (
+                );
+              } else if (data.displayValue !== undefined && typeof data.symbol === "string") {
+                const displayValue = typeof data.displayValue === "number" ? data.displayValue : String(data.displayValue);
+                displayContent = (
                   <div className="w-full">
                     <div className="mt-2">
-                      Balance: {balance.displayValue} {balance.symbol}
+                      Balance: {displayValue} {data.symbol}
                     </div>
                   </div>
-                ),
-              },
-            ]);
-            break;
+                );
+              } else {
+                displayContent = (
+                  <div className="markdown-content space-y-4">
+                    <ReactMarkdown>
+                      {JSON.stringify(result.data, null, 2)}
+                    </ReactMarkdown>
+                  </div>
+                );
+              }
+            } else {
+              displayContent = (
+                <div className="markdown-content space-y-4">
+                  <ReactMarkdown>Operation completed successfully.</ReactMarkdown>
+                </div>
+              );
+            }
 
-          default:
             setMessages([
               ...newMessages.slice(0, -1),
               {
                 role: "bot",
-                content: (
-                  <div className="markdown-content space-y-4">
-                    <ReactMarkdown>
-                      {data.analysis ||
-                        "No information available for this query."}
-                    </ReactMarkdown>
-                  </div>
-                ),
+                content: displayContent,
               },
             ]);
+          } else {
+            throw new Error(result.error || "Plugin execution failed");
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Failed to execute function";
+          setMessages([
+            ...newMessages.slice(0, -1),
+            {
+              role: "bot",
+              content: (
+                <div className="text-red-500">
+                  Error: {errorMessage}
+                </div>
+              ),
+            },
+          ]);
         }
       } else {
         // Regular AI response (strategy or information)
@@ -260,9 +203,8 @@ export default function Home() {
         ...newMessages.slice(0, -1),
         {
           role: "bot",
-          content: `Error: ${
-            error instanceof Error ? error.message : "Operation failed"
-          }`,
+          content: `Error: ${error instanceof Error ? error.message : "Operation failed"
+            }`,
         },
       ]);
     } finally {
@@ -307,16 +249,14 @@ export default function Home() {
               {messages.map(({ role, content }, idx) => (
                 <div
                   key={idx}
-                  className={`flex ${
-                    role === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex ${role === "user" ? "justify-end" : "justify-start"
+                    }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      role === "user"
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
-                    }`}
+                      }`}
                   >
                     <div className="whitespace-pre-wrap">{content}</div>
                   </div>
