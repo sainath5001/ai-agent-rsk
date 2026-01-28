@@ -47,7 +47,7 @@ export const priceCheckerPlugin: IPlugin = {
 
   async execute(
     functionName: string,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     context: PluginContext
   ): Promise<PluginResult> {
     if (functionName !== "checkPrice") {
@@ -58,7 +58,7 @@ export const priceCheckerPlugin: IPlugin = {
     }
 
     try {
-      const { token } = args;
+      const token = typeof args.token === "string" ? args.token : undefined;
 
       if (!token) {
         return {
@@ -79,11 +79,12 @@ export const priceCheckerPlugin: IPlugin = {
           currency: "USD",
         },
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error("Price check failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to check price";
       return {
         success: false,
-        error: error.message || "Failed to check price",
+        error: errorMessage,
       };
     }
   },

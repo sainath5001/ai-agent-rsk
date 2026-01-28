@@ -28,10 +28,7 @@ console.log('   - src/app/api/ai/route.ts (Backend - uses plugins)');
 console.log('   - src/app/page.tsx (Frontend - uses plugin executor)');
 console.log('');
 
-console.log('✅ Documentation:');
-console.log('   - docs/plugins/DEVELOPMENT.md (Plugin development guide)');
-console.log('   - docs/plugins/TESTING.md (Testing guide)');
-console.log('   - CONTRIBUTING.md (Contribution guidelines)');
+console.log('✅ Example Plugins:');
 console.log('   - plugins/examples/ (Example plugins)');
 console.log('');
 
@@ -44,4 +41,6 @@ console.log('');
 
 console.log('✨ Plugin Framework is ready!');
 console.log('   Developers can now create custom plugins using the framework.');
+
+
 

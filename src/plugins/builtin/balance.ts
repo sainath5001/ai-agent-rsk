@@ -1,12 +1,7 @@
-/**
- * Built-in Balance Plugin
- * 
- * Checks token balances on Rootstock testnet.
- */
 
 import { IPlugin, PluginMetadata, PluginFunction, PluginContext, PluginResult } from "../types";
 import { getBalance, readContract } from "@wagmi/core";
-import { erc20Abi, checksumAddress, isAddress } from "viem";
+import { erc20Abi, checksumAddress, isAddress, formatEther } from "viem";
 import { findToken } from "@/lib/utils";
 
 const metadata: PluginMetadata = {
@@ -84,16 +79,16 @@ export const balancePlugin: IPlugin = {
       let balance;
 
       if (tokenAdd === "trbtc") {
-        const queryBalance = await getBalance(context.config as any, {
+        const queryBalance = await getBalance(context.config, {
           address: acc as `0x${string}`,
         });
 
         balance = {
-          displayValue: Number(queryBalance.value) / 10e18,
+          displayValue: Number(formatEther(queryBalance.value)),
           symbol: "tRBTC",
         };
       } else {
-        const queryBalance = await readContract(context.config as any, {
+        const queryBalance = await readContract(context.config, {
           abi: erc20Abi,
           address: checksumAddress(tokenAdd as `0x${string}`) as `0x${string}`,
           functionName: "balanceOf",
@@ -101,7 +96,7 @@ export const balancePlugin: IPlugin = {
         });
 
         balance = {
-          displayValue: Number(queryBalance) / 10e18,
+          displayValue: Number(formatEther(queryBalance as bigint)),
           symbol: token1 as string,
         };
       }

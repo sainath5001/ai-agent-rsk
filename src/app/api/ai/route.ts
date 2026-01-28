@@ -3,19 +3,37 @@ import { Groq } from "groq-sdk";
 import { pluginRegistry } from "@/plugins";
 import { initializePlugins } from "@/plugins";
 
-// Initialize plugins on module load (only once)
 let pluginsInitialized = false;
 let initPromise: Promise<void> | null = null;
+const initLock = { locked: false };
 
-function ensurePluginsInitialized() {
-  if (!pluginsInitialized && !initPromise) {
+async function ensurePluginsInitialized(): Promise<void> {
+  if (pluginsInitialized) {
+    return;
+  }
+
+  if (initLock.locked) {
+    while (initPromise) {
+      await initPromise;
+    }
+    return;
+  }
+
+  initLock.locked = true;
+  if (!initPromise) {
     initPromise = initializePlugins()
       .then(() => {
         pluginsInitialized = true;
+        initLock.locked = false;
       })
-      .catch(console.error);
+      .catch((error) => {
+        console.error("Plugin initialization failed:", error);
+        initLock.locked = false;
+        throw error;
+      });
   }
-  return initPromise || Promise.resolve();
+
+  await initPromise;
 }
 
 const groqClient = new Groq({
@@ -64,17 +82,18 @@ export async function POST(req: Request) {
     const pluginFunctions = pluginRegistry.getAllFunctions();
     const tools = pluginFunctions.map((item) => item.function);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await groqClient.chat.completions.create({
+    const createParams = {
       model: "llama3-70b-8192",
       max_tokens: 2024,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messages: messages as any, // Groq SDK expects specific message format
+      messages: messages as unknown as Array<{ role: string; content: string }>,
       temperature: 0.7,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tools: tools.length > 0 ? (tools as any) : undefined,
-      tool_choice: tools.length > 0 ? "auto" : undefined,
-    });
+      ...(tools.length > 0 && {
+        tools: tools as unknown as Array<{ type: string; function: unknown }>,
+        tool_choice: "auto" as const,
+      }),
+    };
+    
+    const response = await groqClient.chat.completions.create(createParams as never);
 
     const aiMessage = response.choices[0].message;
     const toolCalls = aiMessage.tool_calls;

@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { useConfig } from "wagmi";
 import { isValidWalletAddress } from "@/lib/utils";
-import { BLOCK_EXPLORER_URL } from "@/lib/contants";
+import { BLOCK_EXPLORER_URL } from "@/lib/constants";
 import { executePluginFunction } from "@/plugins/client-executor";
 
 export default function Home() {

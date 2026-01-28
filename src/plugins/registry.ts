@@ -1,18 +1,9 @@
-/**
- * Plugin Registry
- * 
- * Central registry for managing all plugins in the system.
- */
-
 import { IPlugin, PluginRegistration, PluginContext } from "./types";
 
 class PluginRegistry {
   private plugins: Map<string, PluginRegistration> = new Map();
   private context: PluginContext | null = null;
 
-  /**
-   * Register a plugin in the registry
-   */
   register(plugin: IPlugin): void {
     if (this.plugins.has(plugin.metadata.name)) {
       console.warn(
@@ -28,7 +19,6 @@ class PluginRegistry {
 
     this.plugins.set(plugin.metadata.name, registration);
 
-    // Initialize plugin if context is available
     if (this.context && plugin.init) {
       const initResult = plugin.init(this.context);
       if (initResult instanceof Promise) {
@@ -41,9 +31,6 @@ class PluginRegistry {
     console.log(`Plugin registered: ${plugin.metadata.name} v${plugin.metadata.version}`);
   }
 
-  /**
-   * Unregister a plugin
-   */
   unregister(pluginName: string): void {
     const registration = this.plugins.get(pluginName);
     if (registration) {
@@ -60,17 +47,11 @@ class PluginRegistry {
     }
   }
 
-  /**
-   * Get a plugin by name
-   */
   get(pluginName: string): IPlugin | undefined {
     const registration = this.plugins.get(pluginName);
     return registration?.enabled ? registration.plugin : undefined;
   }
 
-  /**
-   * Get a plugin function by function name
-   */
   getPluginByFunction(functionName: string): { plugin: IPlugin; functionName: string } | null {
     for (const registration of this.plugins.values()) {
       if (!registration.enabled) continue;
@@ -85,18 +66,12 @@ class PluginRegistry {
     return null;
   }
 
-  /**
-   * Get all registered plugins
-   */
   getAllPlugins(): IPlugin[] {
     return Array.from(this.plugins.values())
       .filter((reg) => reg.enabled)
       .map((reg) => reg.plugin);
   }
 
-  /**
-   * Get all functions from all enabled plugins
-   */
   getAllFunctions(): Array<{ plugin: string; function: unknown }> {
     const functions: Array<{ plugin: string; function: unknown }> = [];
 
@@ -121,13 +96,9 @@ class PluginRegistry {
     return functions;
   }
 
-  /**
-   * Set the execution context for plugins
-   */
   setContext(context: PluginContext): void {
     this.context = context;
 
-    // Initialize all plugins with the new context
     for (const registration of this.plugins.values()) {
       if (registration.plugin.init) {
         const initResult = registration.plugin.init(context);
@@ -143,16 +114,10 @@ class PluginRegistry {
     }
   }
 
-  /**
-   * Get the current context
-   */
   getContext(): PluginContext | null {
     return this.context;
   }
 
-  /**
-   * Enable/disable a plugin
-   */
   setEnabled(pluginName: string, enabled: boolean): void {
     const registration = this.plugins.get(pluginName);
     if (registration) {
@@ -161,21 +126,14 @@ class PluginRegistry {
     }
   }
 
-  /**
-   * Check if a plugin is registered
-   */
   has(pluginName: string): boolean {
     return this.plugins.has(pluginName);
   }
 
-  /**
-   * Get plugin count
-   */
   count(): number {
     return this.plugins.size;
   }
 }
 
-// Export singleton instance
 export const pluginRegistry = new PluginRegistry();
 

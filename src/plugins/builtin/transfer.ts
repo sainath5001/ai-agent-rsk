@@ -1,14 +1,9 @@
-/**
- * Built-in Transfer Plugin
- * 
- * Handles token transfers on Rootstock testnet.
- */
 
 import { IPlugin, PluginMetadata, PluginFunction, PluginContext, PluginResult } from "../types";
 import { sendTransaction, writeContract } from "@wagmi/core";
-import { erc20Abi, parseEther } from "viem";
-import { findToken } from "@/lib/utils";
-import { BLOCK_EXPLORER_URL } from "@/lib/contants";
+import { erc20Abi, parseEther, parseUnits, isAddress } from "viem";
+import { findToken, isValidWalletAddress } from "@/lib/utils";
+import { BLOCK_EXPLORER_URL } from "@/lib/constants";
 
 const metadata: PluginMetadata = {
   name: "transfer",
@@ -66,6 +61,13 @@ export const transferPlugin: IPlugin = {
         };
       }
 
+      if (!isValidWalletAddress(address) || !isAddress(address)) {
+        return {
+          success: false,
+          error: "Invalid wallet address",
+        };
+      }
+
       const tokenAddress =
         token1.toLowerCase() === "trbtc"
           ? "trbtc"
@@ -81,16 +83,17 @@ export const transferPlugin: IPlugin = {
       let transactionHash: string;
 
       if (tokenAddress === "trbtc") {
-        transactionHash = await sendTransaction(context.config as any, {
+        transactionHash = await sendTransaction(context.config, {
           to: address as `0x${string}`,
           value: parseEther(amount.toString()),
         });
       } else {
-        transactionHash = await writeContract(context.config as any, {
+        const tokenAmount = parseUnits(amount.toString(), 18);
+        transactionHash = await writeContract(context.config, {
           abi: erc20Abi,
           address: tokenAddress as `0x${string}`,
           functionName: "transfer",
-          args: [address as `0x${string}`, BigInt(Math.floor(amount))],
+          args: [address as `0x${string}`, tokenAmount],
         });
       }
 
