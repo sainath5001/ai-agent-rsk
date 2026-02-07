@@ -15,9 +15,8 @@ export async function findToken(query: string): Promise<string | null> {
 	try {
 		const tokenLowerCase = query.toLowerCase();
 
-		// Make API call to Blockscout
 		const response = await fetch(
-			`https://rootstock-testnet.blockscout.com/api/v2/tokens?q=${tokenLowerCase}&type=ERC-20`
+			`https://rootstock-testnet.blockscout.com/api/v2/tokens?q=${encodeURIComponent(tokenLowerCase)}&type=ERC-20`
 		);
 
 		if (!response.ok) {
@@ -26,16 +25,12 @@ export async function findToken(query: string): Promise<string | null> {
 
 		const data = await response.json();
 
-		// Check if we have any results
 		if (data.items && data.items.length > 0) {
-			// Return the address of the first token found
 			return data.items[0].address;
 		}
 
-		// Return null if no tokens found
 		return null;
 	} catch (error) {
-		console.error("Error fetching token:", error);
 		return null;
 	}
 }

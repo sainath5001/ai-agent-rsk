@@ -1,6 +1,7 @@
 
 import { IPlugin } from "./types";
 import { pluginRegistry } from "./registry";
+import { logger } from "@/lib/logger";
 
 export async function loadPlugins(plugins: IPlugin[]): Promise<void> {
   for (const plugin of plugins) {
@@ -13,7 +14,7 @@ export async function loadPlugins(plugins: IPlugin[]): Promise<void> {
 
       pluginRegistry.register(plugin);
     } catch (error) {
-      console.error(`Failed to load plugin:`, error);
+      logger.error(`Failed to load plugin:`, error);
     }
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Groq } from "groq-sdk";
 import { pluginRegistry } from "@/plugins";
 import { initializePlugins } from "@/plugins";
+import { logger } from "@/lib/logger";
 
 let pluginsInitialized = false;
 let initPromise: Promise<void> | null = null;
@@ -21,16 +22,16 @@ async function ensurePluginsInitialized(): Promise<void> {
 
   initLock.locked = true;
   if (!initPromise) {
-    initPromise = initializePlugins()
-      .then(() => {
-        pluginsInitialized = true;
-        initLock.locked = false;
-      })
-      .catch((error) => {
-        console.error("Plugin initialization failed:", error);
-        initLock.locked = false;
-        throw error;
-      });
+        initPromise = initializePlugins()
+          .then(() => {
+            pluginsInitialized = true;
+            initLock.locked = false;
+          })
+          .catch((error) => {
+            logger.error("Plugin initialization failed:", error);
+            initLock.locked = false;
+            throw error;
+          });
   }
 
   await initPromise;
@@ -98,11 +99,19 @@ export async function POST(req: Request) {
     const aiMessage = response.choices[0].message;
     const toolCalls = aiMessage.tool_calls;
 
-    // Handle function calls if present
     if (toolCalls && toolCalls.length > 0) {
       const toolCall = toolCalls[0];
       const functionName = toolCall.function.name;
-      const functionArgs = JSON.parse(toolCall.function.arguments);
+      
+      let functionArgs;
+      try {
+        functionArgs = JSON.parse(toolCall.function.arguments);
+      } catch (error) {
+        return NextResponse.json(
+          { error: "Invalid function arguments from AI" },
+          { status: 400 }
+        );
+      }
 
       return NextResponse.json({
         analysis: aiMessage.content || "Processing your request...",
@@ -120,7 +129,7 @@ export async function POST(req: Request) {
       type,
     });
   } catch (error) {
-    console.error("AI Analysis Error:", error);
+    logger.error("AI Analysis Error:", error);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   }
 }

@@ -61,7 +61,6 @@ export default function Home() {
     setMessages(newMessages);
 
     try {
-      // Extract text-only message history for API
       const messageHistory = messages.map((msg) => ({
         role: msg.role,
         content:
@@ -70,7 +69,6 @@ export default function Home() {
             : "Content not available as string",
       }));
 
-      // Process all requests through the AI endpoint
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,20 +82,16 @@ export default function Home() {
 
       const data = await response.json();
 
-      console.log("AI response:", data);
-
       if (data?.functionCall) {
         const functionData = data.functionCall;
 
         try {
-          // Execute plugin function dynamically
           const pluginContext = {
             address,
             isConnected,
             config,
           };
 
-          // Validate address for transfer function
           if (functionData.name === "transfer" && !isValidWalletAddress(functionData?.arguments?.address)) {
             throw new Error("Invalid wallet address");
           }
@@ -109,13 +103,11 @@ export default function Home() {
           );
 
           if (result.success) {
-            // Handle display content if provided, otherwise format the data
             let displayContent: React.ReactNode;
 
             if (result.displayContent) {
               displayContent = result.displayContent;
             } else if (result.data) {
-              // Format common result types
               const data = result.data as Record<string, unknown>;
 
               if (data.transactionHash && typeof data.transactionHash === "string") {
@@ -183,7 +175,6 @@ export default function Home() {
           ]);
         }
       } else {
-        // Regular AI response (strategy or information)
         setMessages([
           ...newMessages.slice(0, -1),
           {
@@ -254,8 +245,8 @@ export default function Home() {
                 >
                   <div
                     className={`max-w-[80%] rounded-lg px-4 py-2 ${role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
                       }`}
                   >
                     <div className="whitespace-pre-wrap">{content}</div>

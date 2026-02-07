@@ -1,4 +1,5 @@
 import type { Config } from "wagmi";
+import type { ReactNode } from "react";
 
 export interface PluginMetadata {
   name: string;
@@ -34,7 +35,7 @@ export interface PluginResult {
   success: boolean;
   data?: unknown;
   error?: string;
-  displayContent?: React.ReactNode;
+  displayContent?: ReactNode;
 }
 
 export interface IPlugin {

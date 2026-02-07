@@ -2,7 +2,8 @@
 import { IPlugin, PluginMetadata, PluginFunction, PluginContext, PluginResult } from "../types";
 import { getBalance, readContract } from "@wagmi/core";
 import { erc20Abi, checksumAddress, isAddress, formatEther } from "viem";
-import { findToken } from "@/lib/utils";
+import { findToken, isValidWalletAddress } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 const metadata: PluginMetadata = {
   name: "balance",
@@ -67,7 +68,7 @@ export const balancePlugin: IPlugin = {
         };
       }
 
-      const acc = address && isAddress(address) ? address : context.address;
+      const acc = address && isAddress(address) && isValidWalletAddress(address) ? address : context.address;
 
       if (!acc) {
         return {
@@ -106,7 +107,7 @@ export const balancePlugin: IPlugin = {
         data: balance,
       };
     } catch (error) {
-      console.error("Failed to fetch balance:", error);
+      logger.error("Failed to fetch balance:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch balance";
       return {
         success: false,

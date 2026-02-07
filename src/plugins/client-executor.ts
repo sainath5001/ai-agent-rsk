@@ -1,5 +1,6 @@
 import { IPlugin, PluginContext, PluginResult } from "./types";
 import { pluginRegistry } from "./registry";
+import { logger } from "@/lib/logger";
 
 export function registerClientPlugin(plugin: IPlugin): void {
   pluginRegistry.register(plugin);
@@ -11,7 +12,7 @@ export async function executePluginFunction(
   context: PluginContext
 ): Promise<PluginResult> {
   const result = pluginRegistry.getPluginByFunction(functionName);
-  
+
   if (!result) {
     return {
       success: false,
@@ -22,7 +23,7 @@ export async function executePluginFunction(
   try {
     return await result.plugin.execute(functionName, args, context);
   } catch (error) {
-    console.error(`Plugin execution error for ${functionName}:`, error);
+    logger.error(`Plugin execution error for ${functionName}:`, error);
     const errorMessage = error instanceof Error ? error.message : "Plugin execution failed";
     return {
       success: false,

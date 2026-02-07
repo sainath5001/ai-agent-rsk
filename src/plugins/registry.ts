@@ -1,4 +1,5 @@
 import { IPlugin, PluginRegistration, PluginContext } from "./types";
+import { logger } from "@/lib/logger";
 
 class PluginRegistry {
   private plugins: Map<string, PluginRegistration> = new Map();
@@ -6,7 +7,7 @@ class PluginRegistry {
 
   register(plugin: IPlugin): void {
     if (this.plugins.has(plugin.metadata.name)) {
-      console.warn(
+      logger.warn(
         `Plugin ${plugin.metadata.name} is already registered. Overwriting...`
       );
     }
@@ -23,12 +24,12 @@ class PluginRegistry {
       const initResult = plugin.init(this.context);
       if (initResult instanceof Promise) {
         initResult.catch((error) => {
-          console.error(`Failed to initialize plugin ${plugin.metadata.name}:`, error);
+          logger.error(`Failed to initialize plugin ${plugin.metadata.name}:`, error);
         });
       }
     }
 
-    console.log(`Plugin registered: ${plugin.metadata.name} v${plugin.metadata.version}`);
+    logger.info(`Plugin registered: ${plugin.metadata.name} v${plugin.metadata.version}`);
   }
 
   unregister(pluginName: string): void {
@@ -38,12 +39,12 @@ class PluginRegistry {
         const cleanupResult = registration.plugin.cleanup();
         if (cleanupResult instanceof Promise) {
           cleanupResult.catch((error: unknown) => {
-            console.error(`Failed to cleanup plugin ${pluginName}:`, error);
+            logger.error(`Failed to cleanup plugin ${pluginName}:`, error);
           });
         }
       }
       this.plugins.delete(pluginName);
-      console.log(`Plugin unregistered: ${pluginName}`);
+      logger.info(`Plugin unregistered: ${pluginName}`);
     }
   }
 
@@ -104,7 +105,7 @@ class PluginRegistry {
         const initResult = registration.plugin.init(context);
         if (initResult instanceof Promise) {
           initResult.catch((error) => {
-            console.error(
+            logger.error(
               `Failed to initialize plugin ${registration.plugin.metadata.name}:`,
               error
             );
@@ -122,7 +123,7 @@ class PluginRegistry {
     const registration = this.plugins.get(pluginName);
     if (registration) {
       registration.enabled = enabled;
-      console.log(`Plugin ${pluginName} ${enabled ? "enabled" : "disabled"}`);
+      logger.info(`Plugin ${pluginName} ${enabled ? "enabled" : "disabled"}`);
     }
   }
 

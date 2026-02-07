@@ -1,9 +1,10 @@
 
 import { IPlugin, PluginMetadata, PluginFunction, PluginContext, PluginResult } from "../types";
-import { sendTransaction, writeContract } from "@wagmi/core";
+import { sendTransaction, writeContract, readContract } from "@wagmi/core";
 import { erc20Abi, parseEther, parseUnits, isAddress } from "viem";
 import { findToken, isValidWalletAddress } from "@/lib/utils";
 import { BLOCK_EXPLORER_URL } from "@/lib/constants";
+import { logger } from "@/lib/logger";
 
 const metadata: PluginMetadata = {
   name: "transfer",
@@ -80,6 +81,34 @@ export const transferPlugin: IPlugin = {
         };
       }
 
+      if (tokenAddress !== "trbtc") {
+        try {
+          const tokenContract = tokenAddress as `0x${string}`;
+          await Promise.all([
+            readContract(context.config, {
+              abi: erc20Abi,
+              address: tokenContract,
+              functionName: "name",
+            }),
+            readContract(context.config, {
+              abi: erc20Abi,
+              address: tokenContract,
+              functionName: "symbol",
+            }),
+            readContract(context.config, {
+              abi: erc20Abi,
+              address: tokenContract,
+              functionName: "decimals",
+            }),
+          ]);
+        } catch (error) {
+          return {
+            success: false,
+            error: "Invalid ERC20 contract address",
+          };
+        }
+      }
+
       let transactionHash: string;
 
       if (tokenAddress === "trbtc") {
@@ -88,7 +117,13 @@ export const transferPlugin: IPlugin = {
           value: parseEther(amount.toString()),
         });
       } else {
-        const tokenAmount = parseUnits(amount.toString(), 18);
+        const decimals = await readContract(context.config, {
+          abi: erc20Abi,
+          address: tokenAddress as `0x${string}`,
+          functionName: "decimals",
+        });
+        
+        const tokenAmount = parseUnits(amount.toString(), Number(decimals));
         transactionHash = await writeContract(context.config, {
           abi: erc20Abi,
           address: tokenAddress as `0x${string}`,
@@ -105,7 +140,7 @@ export const transferPlugin: IPlugin = {
         },
       };
     } catch (error) {
-      console.error("Transfer failed:", error);
+      logger.error("Transfer failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Transfer failed";
       return {
         success: false,
