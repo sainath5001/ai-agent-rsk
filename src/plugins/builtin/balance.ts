@@ -1,7 +1,7 @@
 
 import { IPlugin, PluginMetadata, PluginFunction, PluginContext, PluginResult } from "../types";
 import { getBalance, readContract } from "@wagmi/core";
-import { erc20Abi, checksumAddress, isAddress, formatEther } from "viem";
+import { erc20Abi, checksumAddress, isAddress, formatEther, formatUnits } from "viem";
 import { findToken, isValidWalletAddress } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 
@@ -89,15 +89,24 @@ export const balancePlugin: IPlugin = {
           symbol: "tRBTC",
         };
       } else {
-        const queryBalance = await readContract(context.config, {
-          abi: erc20Abi,
-          address: checksumAddress(tokenAdd as `0x${string}`) as `0x${string}`,
-          functionName: "balanceOf",
-          args: [acc as `0x${string}`],
-        });
+        const tokenContract = checksumAddress(tokenAdd as `0x${string}`) as `0x${string}`;
+
+        const [queryBalance, decimals] = await Promise.all([
+          readContract(context.config, {
+            abi: erc20Abi,
+            address: tokenContract,
+            functionName: "balanceOf",
+            args: [acc as `0x${string}`],
+          }),
+          readContract(context.config, {
+            abi: erc20Abi,
+            address: tokenContract,
+            functionName: "decimals",
+          }),
+        ]);
 
         balance = {
-          displayValue: Number(formatEther(queryBalance as bigint)),
+          displayValue: Number(formatUnits(queryBalance as bigint, Number(decimals))),
           symbol: token1 as string,
         };
       }
