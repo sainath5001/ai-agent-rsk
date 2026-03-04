@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       let functionArgs;
       try {
         functionArgs = JSON.parse(toolCall.function.arguments);
-      } catch (error) {
+      } catch {
         return NextResponse.json(
           { error: "Invalid function arguments from AI" },
           { status: 400 }

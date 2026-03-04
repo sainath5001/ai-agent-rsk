@@ -101,7 +101,7 @@ export const transferPlugin: IPlugin = {
               functionName: "decimals",
             }),
           ]);
-        } catch (error) {
+        } catch {
           return {
             success: false,
             error: "Invalid ERC20 contract address",

@@ -2,7 +2,6 @@
 import { loadPlugins } from "./loader";
 import { transferPlugin } from "./builtin/transfer";
 import { balancePlugin } from "./builtin/balance";
-import { pluginRegistry } from "./registry";
 
 export async function initializePlugins() {
   await loadPlugins([transferPlugin, balancePlugin]);

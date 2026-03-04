@@ -30,7 +30,7 @@ export async function findToken(query: string): Promise<string | null> {
 		}
 
 		return null;
-	} catch (error) {
+	} catch {
 		return null;
 	}
 }
