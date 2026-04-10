@@ -1,10 +1,6 @@
-import { IPlugin, PluginContext, PluginResult } from "./types";
 import { pluginRegistry } from "./registry";
 import { logger } from "@/lib/logger";
-
-export function registerClientPlugin(plugin: IPlugin): void {
-  pluginRegistry.register(plugin);
-}
+import type { PluginContext, PluginResult } from "./types";
 
 export async function executePluginFunction(
   functionName: string,

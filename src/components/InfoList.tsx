@@ -23,7 +23,7 @@ export const InfoList = () => {
   const mounted = useClientMounted();
 
   useEffect(() => {
-    console.log("Events: ", events);
+    // Intentionally no-op: avoid logging potentially sensitive wallet events in production.
   }, [events]);
 
   return !mounted ? null : (

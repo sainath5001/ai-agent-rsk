@@ -1,5 +1,10 @@
 import type { Config } from "wagmi";
-import type { ReactNode } from "react";
+
+export type PluginDisplay =
+  | { kind: "none" }
+  | { kind: "markdown"; markdown: string }
+  | { kind: "tx"; transactionHash: string; explorerUrl?: string }
+  | { kind: "balance"; displayValue: string | number; symbol: string };
 
 export interface PluginMetadata {
   name: string;
@@ -35,7 +40,7 @@ export interface PluginResult {
   success: boolean;
   data?: unknown;
   error?: string;
-  displayContent?: ReactNode;
+  display?: PluginDisplay;
 }
 
 export interface IPlugin {

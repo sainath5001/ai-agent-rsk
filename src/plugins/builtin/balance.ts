@@ -114,6 +114,11 @@ export const balancePlugin: IPlugin = {
       return {
         success: true,
         data: balance,
+        display: {
+          kind: "balance",
+          displayValue: balance.displayValue,
+          symbol: balance.symbol,
+        },
       };
     } catch (error) {
       logger.error("Failed to fetch balance:", error);

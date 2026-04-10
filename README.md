@@ -56,7 +56,9 @@ Optional but recommended:
      NEXT_PUBLIC_PROJECT_ID=
      NEXT_PUBLIC_RPC_MAINNET=
      NEXT_PUBLIC_RPC_TESTNET=
-     NEXT_PUBLIC_GROQ_API_KEY=
+     GROQ_API_KEY=
+     # Optional: protect /api/ai in production deployments
+     AI_AGENT_API_KEY=
      ```
    You can get the api keys this way:
 

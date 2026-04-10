@@ -62,6 +62,13 @@ export const transferPlugin: IPlugin = {
         };
       }
 
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return {
+          success: false,
+          error: "Invalid amount: must be a positive number",
+        };
+      }
+
       if (!isValidWalletAddress(address) || !isAddress(address)) {
         return {
           success: false,
@@ -81,10 +88,14 @@ export const transferPlugin: IPlugin = {
         };
       }
 
+      // Verify token resolution on-chain to reduce reliance on external APIs.
+      // Also reuse decimals later to avoid a duplicate RPC call.
+      let tokenDecimals: number | null = null;
+
       if (tokenAddress !== "trbtc") {
         try {
           const tokenContract = tokenAddress as `0x${string}`;
-          await Promise.all([
+          const [, symbol, decimals] = await Promise.all([
             readContract(context.config, {
               abi: erc20Abi,
               address: tokenContract,
@@ -101,6 +112,20 @@ export const transferPlugin: IPlugin = {
               functionName: "decimals",
             }),
           ]);
+
+          if (typeof symbol === "string" && symbol.toLowerCase() !== token1.toLowerCase()) {
+            return {
+              success: false,
+              error: "Resolved token does not match requested symbol",
+            };
+          }
+          tokenDecimals = Number(decimals);
+          if (!Number.isFinite(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > 255) {
+            return {
+              success: false,
+              error: "Invalid token decimals",
+            };
+          }
         } catch {
           return {
             success: false,
@@ -117,13 +142,14 @@ export const transferPlugin: IPlugin = {
           value: parseEther(amount.toString()),
         });
       } else {
-        const decimals = await readContract(context.config, {
-          abi: erc20Abi,
-          address: tokenAddress as `0x${string}`,
-          functionName: "decimals",
-        });
-        
-        const tokenAmount = parseUnits(amount.toString(), Number(decimals));
+        const decimals = tokenDecimals ?? Number(
+          await readContract(context.config, {
+            abi: erc20Abi,
+            address: tokenAddress as `0x${string}`,
+            functionName: "decimals",
+          })
+        );
+        const tokenAmount = parseUnits(amount.toString(), decimals);
         transactionHash = await writeContract(context.config, {
           abi: erc20Abi,
           address: tokenAddress as `0x${string}`,
@@ -135,6 +161,11 @@ export const transferPlugin: IPlugin = {
       return {
         success: true,
         data: {
+          transactionHash,
+          explorerUrl: `${BLOCK_EXPLORER_URL}${transactionHash}`,
+        },
+        display: {
+          kind: "tx",
           transactionHash,
           explorerUrl: `${BLOCK_EXPLORER_URL}${transactionHash}`,
         },

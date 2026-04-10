@@ -1,15 +1,17 @@
-import { IPlugin, PluginRegistration, PluginContext } from "./types";
+import { IPlugin, PluginRegistration } from "./types";
 import { logger } from "@/lib/logger";
 
 class PluginRegistry {
   private plugins: Map<string, PluginRegistration> = new Map();
-  private context: PluginContext | null = null;
+  private readonly reservedPluginNames = new Set(["transfer", "balance"]);
+  private readonly reservedFunctionNames = new Set(["transfer", "balance"]);
 
   register(plugin: IPlugin): void {
     if (this.plugins.has(plugin.metadata.name)) {
-      logger.warn(
-        `Plugin ${plugin.metadata.name} is already registered. Overwriting...`
-      );
+      if (this.reservedPluginNames.has(plugin.metadata.name)) {
+        throw new Error(`Cannot overwrite reserved plugin: ${plugin.metadata.name}`);
+      }
+      logger.warn(`Plugin ${plugin.metadata.name} is already registered. Overwriting...`);
     }
 
     const registration: PluginRegistration = {
@@ -18,16 +20,22 @@ class PluginRegistry {
       loadedAt: new Date(),
     };
 
-    this.plugins.set(plugin.metadata.name, registration);
-
-    if (this.context && plugin.init) {
-      const initResult = plugin.init(this.context);
-      if (initResult instanceof Promise) {
-        initResult.catch((error) => {
-          logger.error(`Failed to initialize plugin ${plugin.metadata.name}:`, error);
-        });
+    // Prevent collisions on core function names and ambiguous multi-plugin dispatch.
+    for (const fn of plugin.functions) {
+      if (this.reservedFunctionNames.has(fn.name) && plugin.metadata.name !== fn.name) {
+        throw new Error(
+          `Plugin ${plugin.metadata.name} cannot register reserved function: ${fn.name}`
+        );
+      }
+      const existing = this.getPluginByFunction(fn.name);
+      if (existing && existing.plugin.metadata.name !== plugin.metadata.name) {
+        throw new Error(
+          `Function name collision: ${fn.name} already provided by ${existing.plugin.metadata.name}`
+        );
       }
     }
+
+    this.plugins.set(plugin.metadata.name, registration);
 
     logger.info(`Plugin registered: ${plugin.metadata.name} v${plugin.metadata.version}`);
   }
@@ -73,8 +81,20 @@ class PluginRegistry {
       .map((reg) => reg.plugin);
   }
 
-  getAllFunctions(): Array<{ plugin: string; function: unknown }> {
-    const functions: Array<{ plugin: string; function: unknown }> = [];
+  getAllFunctions(): Array<{
+    plugin: string;
+    function: {
+      type: "function";
+      function: { name: string; description: string; parameters: unknown };
+    };
+  }> {
+    const functions: Array<{
+      plugin: string;
+      function: {
+        type: "function";
+        function: { name: string; description: string; parameters: unknown };
+      };
+    }> = [];
 
     for (const registration of this.plugins.values()) {
       if (!registration.enabled) continue;
@@ -95,28 +115,6 @@ class PluginRegistry {
     }
 
     return functions;
-  }
-
-  setContext(context: PluginContext): void {
-    this.context = context;
-
-    for (const registration of this.plugins.values()) {
-      if (registration.plugin.init) {
-        const initResult = registration.plugin.init(context);
-        if (initResult instanceof Promise) {
-          initResult.catch((error) => {
-            logger.error(
-              `Failed to initialize plugin ${registration.plugin.metadata.name}:`,
-              error
-            );
-          });
-        }
-      }
-    }
-  }
-
-  getContext(): PluginContext | null {
-    return this.context;
   }
 
   setEnabled(pluginName: string, enabled: boolean): void {

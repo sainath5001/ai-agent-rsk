@@ -11,6 +11,7 @@
  */
 
 import { IPlugin, PluginMetadata, PluginFunction, PluginContext, PluginResult } from "@/plugins/types";
+import { logger } from "@/lib/logger";
 
 const metadata: PluginMetadata = {
   name: "price-checker",
@@ -42,7 +43,7 @@ export const priceCheckerPlugin: IPlugin = {
   functions,
 
   async init(context: PluginContext): Promise<void> {
-    console.log("Price Checker plugin initialized");
+    logger.info("Price Checker plugin initialized");
   },
 
   async execute(
@@ -67,9 +68,8 @@ export const priceCheckerPlugin: IPlugin = {
         };
       }
 
-      // Example: In a real implementation, you would fetch price from an API
-      // For demonstration, we'll return a mock price
-      const mockPrice = Math.random() * 100;
+      // Example/stub implementation: replace with a real price feed.
+      const mockPrice = 0;
 
       return {
         success: true,
@@ -78,9 +78,13 @@ export const priceCheckerPlugin: IPlugin = {
           price: mockPrice,
           currency: "USD",
         },
+        display: {
+          kind: "markdown",
+          markdown: `**Stub** price for **${token.toUpperCase()}**: \`$${mockPrice}\` (replace with real API)`,
+        },
       };
     } catch (error) {
-      console.error("Price check failed:", error);
+      logger.error("Price check failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to check price";
       return {
         success: false,
@@ -90,7 +94,7 @@ export const priceCheckerPlugin: IPlugin = {
   },
 
   async cleanup(): Promise<void> {
-    console.log("Price Checker plugin cleaned up");
+    logger.info("Price Checker plugin cleaned up");
   },
 };
 

@@ -1,46 +1,69 @@
 /**
  * Plugin Framework Verification Script
- * 
- * This script verifies that the plugin system is set up correctly.
+ *
+ * This script performs basic static validation of plugin definitions.
  * Run with: node scripts/verify-plugins.js
  */
 
-// Note: This is a simple verification script
-// The actual plugin system runs in the Next.js environment
+const fs = require("fs");
+const path = require("path");
 
-console.log('🔍 Plugin Framework Verification\n');
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
 
-console.log('✅ Plugin System Structure:');
-console.log('   - src/plugins/types.ts (Plugin interfaces)');
-console.log('   - src/plugins/registry.ts (Plugin registry)');
-console.log('   - src/plugins/loader.ts (Plugin loader)');
-console.log('   - src/plugins/index.ts (Entry point)');
-console.log('   - src/plugins/client-executor.ts (Client executor)');
-console.log('');
+function listPluginFiles(dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const out = [];
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...listPluginFiles(p));
+    else if (e.isFile() && p.endsWith(".ts")) out.push(p);
+  }
+  return out;
+}
 
-console.log('✅ Built-in Plugins:');
-console.log('   - src/plugins/builtin/transfer.ts');
-console.log('   - src/plugins/builtin/balance.ts');
-console.log('');
+function validatePluginModuleText(filePath, text) {
+  // This is intentionally a lightweight check (no TS compilation).
+  // Ensures plugin file looks like it exports an IPlugin with metadata/functions/execute.
+  assert(/export\s+const\s+\w+Plugin\s*:\s*IPlugin\s*=/.test(text) || /export\s+const\s+\w+\s*=\s*{/.test(text), `${filePath}: missing exported plugin const`);
+  assert(/metadata\s*:/.test(text), `${filePath}: missing metadata`);
+  assert(/functions\s*:/.test(text), `${filePath}: missing functions`);
+  assert(/execute\s*\(/.test(text), `${filePath}: missing execute()`);
+}
 
-console.log('✅ Integration Points:');
-console.log('   - src/app/api/ai/route.ts (Backend - uses plugins)');
-console.log('   - src/app/page.tsx (Frontend - uses plugin executor)');
-console.log('');
+console.log("🔍 Plugin Framework Verification\n");
 
-console.log('✅ Example Plugins:');
-console.log('   - plugins/examples/ (Example plugins)');
-console.log('');
+const builtinDir = path.join(process.cwd(), "src", "plugins", "builtin");
+const exampleDir = path.join(process.cwd(), "plugins", "examples");
 
-console.log('📋 To Test:');
-console.log('   1. Run: npm run dev');
-console.log('   2. Check browser console for plugin registration logs');
-console.log('   3. Test balance: "What is my tRBTC balance?"');
-console.log('   4. Test transfer: "Send 0.001 tRBTC to [address]"');
-console.log('');
+const pluginFiles = [
+  ...listPluginFiles(builtinDir),
+  ...(fs.existsSync(exampleDir) ? listPluginFiles(exampleDir) : []),
+];
 
-console.log('✨ Plugin Framework is ready!');
-console.log('   Developers can now create custom plugins using the framework.');
+const seenFunctionNames = new Map(); // fnName -> file
+for (const file of pluginFiles) {
+  const text = fs.readFileSync(file, "utf8");
+  validatePluginModuleText(file, text);
+
+  // Best-effort: find function name strings in the functions array.
+  // Only treat "name:" keys inside the functions array as tool names.
+  // This avoids counting plugin metadata.name or other "name" fields.
+  const fnMatches = [...text.matchAll(/functions\s*:\s*\[[\s\S]*?name:\s*["']([a-zA-Z0-9_-]+)["']/g)].map((m) => m[1]);
+  for (const fn of fnMatches) {
+    if (!seenFunctionNames.has(fn)) seenFunctionNames.set(fn, file);
+    else {
+      const prev = seenFunctionNames.get(fn);
+      throw new Error(`Function name collision "${fn}" between:\n- ${prev}\n- ${file}`);
+    }
+  }
+}
+
+console.log("✅ Plugin files validated:");
+for (const file of pluginFiles) console.log(`   - ${path.relative(process.cwd(), file)}`);
+
+console.log("\n✨ Verification completed successfully.");
 
 
 

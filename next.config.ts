@@ -3,7 +3,7 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
 
   transpilePackages: [
@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
         process.cwd(),
         "node_modules/@ungap/structured-clone/cjs/index.js"
       ),
+      // Optional MetaMask connector dependency (not required for this demo build)
+      "@metamask/connect-evm": false,
     };
 
     return config;
