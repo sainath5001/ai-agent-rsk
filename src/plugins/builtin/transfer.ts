@@ -142,14 +142,8 @@ export const transferPlugin: IPlugin = {
           value: parseEther(amount.toString()),
         });
       } else {
-        const decimals = tokenDecimals ?? Number(
-          await readContract(context.config, {
-            abi: erc20Abi,
-            address: tokenAddress as `0x${string}`,
-            functionName: "decimals",
-          })
-        );
-        const tokenAmount = parseUnits(amount.toString(), decimals);
+        // tokenDecimals is set during on-chain verification above for ERC20 transfers.
+        const tokenAmount = parseUnits(amount.toString(), tokenDecimals as number);
         transactionHash = await writeContract(context.config, {
           abi: erc20Abi,
           address: tokenAddress as `0x${string}`,

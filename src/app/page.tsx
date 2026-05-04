@@ -37,7 +37,46 @@ export default function Home() {
     args: Record<string, unknown>;
   } | null>(null);
 
-  const isSendDisabled = useMemo(() => isLoading || !input.trim(), [isLoading, input]);
+  const isSendDisabled = useMemo(
+    () => isLoading || !!pendingTransfer || !input.trim(),
+    [isLoading, pendingTransfer, input]
+  );
+
+  function safeJsonString(value: unknown, maxLen: number): string {
+    try {
+      const s = JSON.stringify(value, null, 2) ?? "";
+      return s.length > maxLen ? `${s.slice(0, maxLen)}…` : s;
+    } catch {
+      return "";
+    }
+  }
+
+  function validateAddressArgsOrThrow(
+    functionName: string,
+    args: Record<string, unknown> | undefined
+  ): void {
+    if (!args) return;
+
+    const addressKeys = new Set([
+      "address",
+      "to",
+      "from",
+      "recipient",
+      "receiver",
+      "spender",
+      "owner",
+      "wallet",
+      "walletAddress",
+    ]);
+
+    for (const [key, value] of Object.entries(args)) {
+      const looksLikeAddressKey = addressKeys.has(key) || key.toLowerCase().endsWith("address");
+      if (!looksLikeAddressKey) continue;
+      if (typeof value !== "string" || !isValidWalletAddress(value)) {
+        throw new Error(`Invalid wallet address for ${functionName}`);
+      }
+    }
+  }
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -105,19 +144,18 @@ export default function Home() {
             config,
           };
 
+          const args = functionData.arguments as Record<string, unknown> | undefined;
+          validateAddressArgsOrThrow(functionData.name, args);
+
           if (functionData.name === "transfer") {
-            const args = functionData.arguments as Record<string, unknown> | undefined;
-            const toAddr = args ? args["address"] : undefined;
-            if (typeof toAddr !== "string" || !isValidWalletAddress(toAddr)) {
-              throw new Error("Invalid wallet address");
-            }
             // Require explicit user confirmation before executing transfers.
             setPendingTransfer({
               functionName: functionData.name,
               args: (functionData.arguments || {}) as Record<string, unknown>,
             });
-            setMessages([
-              ...newMessages.slice(0, -1),
+            // Avoid overwriting chat state if anything changes while confirmation is pending.
+            setMessages((prev) => [
+              ...prev.filter((m) => m.id !== processingMessage.id),
               {
                 id: crypto.randomUUID(),
                 role: "bot",
@@ -174,39 +212,13 @@ export default function Home() {
                   </div>
                 );
               }
-            } else if (result.data) {
-              const data = result.data as Record<string, unknown>;
-
-              if (data.transactionHash && typeof data.transactionHash === "string") {
-                const txHash = data.transactionHash;
-                const explorerUrl = typeof data.explorerUrl === "string" ? data.explorerUrl : `${BLOCK_EXPLORER_URL}${txHash}`;
-                displayContent = (
-                  <a
-                    href={explorerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
-                  >
-                    Transaction: {`${txHash.slice(0, 6)}...${txHash.slice(-4)}`}
-                    <ExternalLink size={16} />
-                  </a>
-                );
-              } else if (data.displayValue !== undefined && typeof data.symbol === "string") {
-                const displayValue = typeof data.displayValue === "number" ? data.displayValue : String(data.displayValue);
-                displayContent = (
-                  <div className="w-full">
-                    <div className="mt-2">
-                      Balance: {displayValue} {data.symbol}
-                    </div>
-                  </div>
-                );
-              } else {
-                displayContent = (
-                  <pre className="text-xs overflow-auto rounded-md border p-3 bg-muted">
-                    <code>{JSON.stringify(result.data, null, 2)}</code>
-                  </pre>
-                );
-              }
+            } else if (result.data !== undefined) {
+              // Treat plugin-provided data as untrusted: render only as a capped JSON blob.
+              displayContent = (
+                <pre className="text-xs overflow-auto rounded-md border p-3 bg-muted">
+                  <code>{safeJsonString(result.data, 20_000)}</code>
+                </pre>
+              );
             } else {
               displayContent = (
                 <div className="markdown-content space-y-4">
@@ -365,10 +377,10 @@ export default function Home() {
 
                       const dataObj = (result.data ?? {}) as Record<string, unknown>;
                       const txHash =
-                        (typeof dataObj["transactionHash"] === "string" ? (dataObj["transactionHash"] as string) : "") ??
+                        (typeof dataObj["transactionHash"] === "string" ? (dataObj["transactionHash"] as string) : "") ||
                         (result.display?.kind === "tx" ? result.display.transactionHash : "");
                       const explorerUrl =
-                        (typeof dataObj["explorerUrl"] === "string" ? (dataObj["explorerUrl"] as string) : undefined) ??
+                        (typeof dataObj["explorerUrl"] === "string" ? (dataObj["explorerUrl"] as string) : undefined) ||
                         (result.display?.kind === "tx" ? result.display.explorerUrl : undefined);
 
                       setMessages((prev) => [

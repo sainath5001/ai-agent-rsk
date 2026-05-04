@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     "react-markdown",
     "mdast-util-to-hast",
     "remark-rehype",
+    "@ungap/structured-clone",
   ],
 
   webpack: (config) => {
@@ -20,6 +21,7 @@ const nextConfig: NextConfig = {
       "@react-native-async-storage/async-storage": false,
       porto: false,
       "porto/internal": false,
+      accounts: false,
     };
 
     // Fix for structured clone import
@@ -31,6 +33,7 @@ const nextConfig: NextConfig = {
       ),
       // Optional MetaMask connector dependency (not required for this demo build)
       "@metamask/connect-evm": false,
+      accounts: false,
     };
 
     return config;
